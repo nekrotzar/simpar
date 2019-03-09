@@ -14,7 +14,7 @@ simpar-omp: simpar-omp.c
 		$(CC) -fopenmp -o simpar-omp simpar-omp.c
 
 clean:
-		-rm -f input/*.out
+		-rm -f test/output/*.out
 		-rm -f *.o
 		-rm -f simpar
 		-rm -f simpar-omp

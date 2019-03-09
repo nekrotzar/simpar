@@ -5,37 +5,52 @@ NUM_THREADS=${2:-4}
 if [[ -n "$PROGRAM" ]]; then
 	#Set number of threads
 	
-	printf "\n*******************************************\n"
-	printf "\Run all particle simulations.\n\n"
-
 	if [[ "$PROGRAM" == "simpar" ]]; then
 		echo "MODE: serial"
 	elif [[ "$PROGRAM" == "simpar-omp" ]]; then
 		export OMP_NUM_THREADS="$NUM_THREADS"
-
-		echo "MODE: openMP parallel"
+		echo "MODE: OpenMP parallel"
 		echo "NUMBER OF THREADS: $NUM_THREADS"
 	fi
-	printf "*******************************************\n\n"
+	
+	COUNT=0
+	SUCCESS=0
+	FAILURE=0
 
-    echo "TEST: seed = 1, ncside = 3, n_particle = 10, nstep = 1"
-    time ./"$PROGRAM" 1 3 10 1
-	echo "=========================================="
+	for filename in test/input/*.in
+	do
+		echo "__________________________________________"
+		COUNT=$((COUNT+1))
+				
+		# Get arguments from file
+		while read name; do
+			echo "Name read from file - $name"
+		done < "$filename"
 
-    echo "TEST: seed = 1, ncside = 3, n_particle = 1000000, nstep = 20"
-    time ./"$PROGRAM" 1 3 1000000 20
-	echo "=========================================="
+		echo "TEST #$COUNT : ./"$PROGRAM" "$name""
+		
+		time ./"$PROGRAM" $name > test/output/test$COUNT.out
 
-    echo "TEST: seed = 1, ncside = 10, n_particle = 2000000, nstep = 10"
-    time ./"$PROGRAM" 1 10 2000000 10
-	echo "=========================================="
+		file1="test/validation/test$COUNT.txt"
+		file2="test/output/test$COUNT.out"
 
-    echo "TEST: seed = 1, ncside = 30, n_particle = 20000000, nstep = 10"
-    time ./"$PROGRAM" 1 30 20000000 10
-	echo "=========================================="
+		# Run the program
+		# Check if the output is correct
+		STATUS="$(diff "$file1" "$file2")"
 
-
+		if [ -n "$STATUS" ] ; then
+			echo "FAILURE :"
+			echo "$STATUS"
+			FAILURE=$((FAILURE+1))
+		else
+			echo
+			echo "SUCCESS"
+			SUCCESS=$((SUCCESS+1))
+		fi
+	done
+	echo "__________________________________________"
+	echo "FINISHED: $SUCCESS out of $COUNT successfull tests"
+	echo "------------------------------------------"
 else
-	echo "Error passing arguments: must pass program name as argument, e.g sudoku-serial ."
+	echo "Error passing arguments: must pass program name as argument, e.g ./run.test.sh simpar"
 fi
-
