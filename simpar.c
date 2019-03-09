@@ -34,7 +34,7 @@ int main(int argc, char const *argv[])
     point2_t c = get_center_of_mass(p, n_part);
 
     printf("%.2f %.2f\n", p[0].position.x, p[0].position.y);
-    printf("%.2f %.2f", c.x, c.y);
+    printf("%.2f %.2f\n", c.x, c.y);
 
     free(p);
     free(g->cells);
