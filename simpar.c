@@ -21,46 +21,52 @@ int main(int argc, char const *argv[])
     particle_t * p = malloc(sizeof(particle_t) * n_part); 
     init_particles(seed, ncside, n_part, p);
 
-    grid_t * g = create_grid(ncside);
+    grid_t * g = malloc(sizeof(grid_t));
+    init_grid(ncside, g);
     
     for(long step = 0; step < n_step; step++)
     {
-        printf("Running simulation step #%ld out of %ld\n", step + 1, n_step);
         update_grid(g, p, n_part);
-        
-        // Complexity (O(n^2))
         update_forces(g, p, n_part);
-
-        // Complexity (O(n))
-        for(long long i = 0; i < n_part; i++)
-        {
-            update_particle(i, p, 1);
-        }
+        update_particles(p, n_part);
     }
 
-    point2_t c = center_of_mass(n_part, p);
+    point2_t c = get_center_of_mass(p, n_part);
 
     printf("%.2f %.2f\n", p[0].position.x, p[0].position.y);
-    printf("%.2f %.2f\n", c.x, c.y);
+    printf("%.2f %.2f", c.x, c.y);
     
     return 0;
 }
 
-grid_t * create_grid(long ncside)
+void init_particles(long seed, long ncside, long long n_part, particle_t * p)
 {
-    grid_t * g = malloc(sizeof(grid_t));
+    long long i;
+    
+    srandom(seed);
+
+    for(i=0; i < n_part; i++)
+    {
+        p[i].position.x = RND0_1;
+        p[i].position.y = RND0_1;
+        p[i].velocity.x = RND0_1 / ncside / 10.0;
+        p[i].velocity.y = RND0_1 / ncside / 10.0;
+        p[i].mass = RND0_1 * ncside / (G * 1e6 * n_part);
+    }
+}
+
+void init_grid(long ncside, grid_t * g)
+{
     g->ncside = ncside;
     g->size = ncside * ncside;
     g->cells = malloc(sizeof(cell_t) * g->size);
-    
+
     for(int i = 0; i < g->size; i++)
     {
         g->cells[i].center.x = 0.0;
         g->cells[i].center.y = 0.0;
         g->cells[i].mass = 0.0;
     }
-
-    return g;
 }
 
 void update_grid(grid_t * g, particle_t * p, long long n_part)
@@ -84,7 +90,6 @@ void update_grid(grid_t * g, particle_t * p, long long n_part)
     }
 }
 
-// FIXME: Create particle system data stri
 long get_cell_index(grid_t * g, point2_t p)
 {
     double xstep = GRID_MAX_X / g->ncside;
@@ -101,36 +106,12 @@ bool is_cell_empty(cell_t c)
     return c.mass == 0;
 }
 
-void update_forces_brute_force(grid_t * g, particle_t * p, long long n_part)
-{
-    for(long long i = 0; i < n_part; i++)
-    {
-        for(long long j = 0; j < n_part; j++)
-        {
-            if(i != j)
-            {
-                vector2_t direction;
-                direction.x = p[j].position.x - p[i].position.x;
-                direction.y = p[j].position.y - p[i].position.y;
-
-                double magnitude = calculate_force_magnitude(p[i], p[j]);
-
-                p[i].force.x += direction.x * magnitude;
-                p[i].force.y += direction.y * magnitude;
-            }
-        }
-    }
-}
-
 void update_forces(grid_t * g, particle_t * p, long long n_part)
 {
     for(long long i = 0; i < n_part; i++)
     {
         for(long j = 0; j < g->size; j++)
         {
-
-            long index = get_cell_index(g, p[i].position);
-
             if(!is_cell_empty(g->cells[j]))
             {
                 vector2_t direction;
@@ -151,21 +132,28 @@ void update_forces(grid_t * g, particle_t * p, long long n_part)
     }
 }
 
-
-void init_particles(long seed, long ncside, long long n_part, particle_t * p)
+double calculate_force_magnitude(particle_t pA, particle_t pB)
 {
-    long long i;
-    
-    srandom(seed);
+    double d = calculate_distance(pA.position, pB.position);
+    double f = G * ((pA.mass * pB.mass) / (d * d));
 
-    for(i=0; i < n_part; i++)
-    {
-        p[i].position.x = RND0_1;
-        p[i].position.y = RND0_1;
-        p[i].velocity.x = RND0_1 / ncside / 10.0;
-        p[i].velocity.y = RND0_1 / ncside / 10.0;
-        p[i].mass = RND0_1 * ncside / (G * 1e6 * n_part);
-    }
+    if(d < EPSLON)
+        return 0.0;
+
+    return f;
+}
+
+double calculate_distance(point2_t pA, point2_t pB)
+{
+    double dx = (pB.x - pA.x);
+    double dy = (pB.y - pA.y);
+    return sqrt((dx * dx) + (dy * dy));
+}
+
+void update_particles(particle_t * p, long long n_part)
+{
+    for(long long i = 0; i < n_part; i++)
+        update_particle(i, p, 1);
 }
 
 void update_particle(long long i, particle_t * p, double dt)
@@ -188,25 +176,13 @@ void update_particle(long long i, particle_t * p, double dt)
     p[i].position.y = (p[i].position.y >= GRID_MAX_Y) ? (p[i].position.y - GRID_MAX_Y) : (p[i].position.y <= GRID_MIN_Y) ? (p[i].position.y + GRID_MAX_Y) : p[i].position.y;
 }
 
-double calculate_distance(point2_t pA, point2_t pB)
+void display_particles(particle_t * p, long long n_part)
 {
-    double dx = (pB.x - pA.x);
-    double dy = (pB.y - pA.y);
-    return sqrt((dx * dx) + (dy * dy));
+    for(int i=0; i < n_part; i++)
+        printf("Particle #%d - p = (%f %f), v = (%f %f), f = (%f %f) | \tm = %f\n", i, p[i].position.x, p[i].position.y, p[i].velocity.x, p[i].velocity.y, p[i].force.x, p[i].force.y, p[i].mass);
 }
 
-double calculate_force_magnitude(particle_t pA, particle_t pB)
-{
-    double d = calculate_distance(pA.position, pB.position);
-    double f = G * ((pA.mass * pB.mass) / (d * d));
-
-    if(d < EPSLON)
-        return 0.0;
-
-    return f;
-}
-
-point2_t center_of_mass(long long n_part, particle_t * p)
+point2_t get_center_of_mass(particle_t * p, long long n_part)
 {
     double tmass = 0.0;
     point2_t center;
@@ -220,15 +196,8 @@ point2_t center_of_mass(long long n_part, particle_t * p)
         tmass += p[i].mass;
     }
 
-    // Divide position by total mass
     center.x /= tmass;
     center.y /= tmass;
 
     return center;
-}
-
-void display_particles(long long n_part, particle_t * p)
-{
-    for(int i=0; i < n_part; i++)
-        printf("Particle #%d - p = (%f %f), v = (%f %f), f = (%f %f) | \tm = %f\n", i, p[i].position.x, p[i].position.y, p[i].velocity.x, p[i].velocity.y, p[i].force.x, p[i].force.y, p[i].mass);
 }
