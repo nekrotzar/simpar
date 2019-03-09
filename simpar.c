@@ -35,6 +35,10 @@ int main(int argc, char const *argv[])
 
     printf("%.2f %.2f\n", p[0].position.x, p[0].position.y);
     printf("%.2f %.2f", c.x, c.y);
+
+    free(p);
+    free(g->cells);
+    free(g);
     
     return 0;
 }
@@ -51,6 +55,8 @@ void init_particles(long seed, long ncside, long long n_part, particle_t * p)
         p[i].position.y = RND0_1;
         p[i].velocity.x = RND0_1 / ncside / 10.0;
         p[i].velocity.y = RND0_1 / ncside / 10.0;
+        p[i].force.x = 0.0;
+        p[i].force.y = 0.0;
         p[i].mass = RND0_1 * ncside / (G * 1e6 * n_part);
     }
 }
