@@ -23,23 +23,13 @@ All the commands can receive the following arguments:
 `npart` **required** Number of particles  
 `nstep` **required** number of time-steps  
 
-**On Windows**
-* Serial
+* **On Windows**
     * `.\simpar.exe [seed] [ncside] [npart] [n_step]`  
     * Example: `.\simpar.exe 1 3 10 1`
-
-* Parallel
-    * `.\simpar-omp.exe [seed] [ncside] [npart] [n_step]`  
-    * Example: `.\simpar-omp.exe 1 3 10 1` 
 	
-**On Linux:**  
-* Serial
+* **On Linux/macOS:**  
     * `./simpar [seed] [ncside] [npart] [n_step]`  
-    * Example: `./simpar.exe 1 3 10 1`
-
-* Parallel  
-    * `./simpar-omp.exe [seed] [ncside] [npart] [n_step]`  
-    * Example: `./simpar-omp.exe 1 3 10 1`
+    * Example: `./simpar 1 3 10 1`
 
 
 #### How to change the number on the parallel version
@@ -69,10 +59,8 @@ Output File Example:
 0.55 0.59
 ```
 
-## Documentation
-In the [docs](docs/) directory is presented a report, [report-omp.pdf](docs/report-omp.pdf) describing the parallel solution using OpenMP. The report describes how the decomposition of the execution flow was made through the threads, how the synchronization and load balancing was performed and what were the concerns. At the end are presented some results regard the inputs on [inputs](inputs/) directory and a brief discussion.
-
 ## Contributors
+* [Filipe Marques](https://github.com/Akorra)
 * [Luís Fonseca](https://github.com/nekrotzar)
 
 ## License  
