@@ -17,9 +17,9 @@
 #include <stdlib.h>
 #include <math.h>
 
-#define RND0_1 ((double)random() / ((long long)1 << 31))
+#define RND0_1 ((double) random() / ((long long)1<<31))
 #define G 6.67408e-11
-#define EPSLON 0.01
+#define EPSLON 0.0005
 
 #define GRID_MIN_X 0
 #define GRID_MAX_X 1
