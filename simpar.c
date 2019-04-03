@@ -2,6 +2,10 @@
 
 int main(int argc, char const *argv[])
 {
+    clock_t start, end;
+    double cpu_time_used;
+    start = clock();
+
     if (argc != 5)
     {
         printf("ERROR: Invalid number of arguments (%d).\n\n", (argc - 1));
@@ -18,12 +22,12 @@ int main(int argc, char const *argv[])
     long long n_part = atoi(argv[3]);
     long n_step = atoi(argv[4]);
 
-    particle_t * p = malloc(sizeof(particle_t) * n_part); 
+    particle_t * p = malloc(sizeof(particle_t) * n_part);
     init_particles(seed, ncside, n_part, p);
 
     grid_t * g = malloc(sizeof(grid_t));
     init_grid(ncside, g);
-    
+
     for(long step = 0; step < n_step; step++)
     {
         update_grid(g, p, n_part);
@@ -39,14 +43,18 @@ int main(int argc, char const *argv[])
     free(p);
     free(g->cells);
     free(g);
-    
+
+    end = clock();
+    cpu_time_used = ((double)(end - start)) / CLOCKS_PER_SEC;
+    printf("%f\n", cpu_time_used);
+
     return 0;
 }
 
 void init_particles(long seed, long ncside, long long n_part, particle_t * p)
 {
     long long i;
-    
+
     srandom(seed);
 
     for(i=0; i < n_part; i++)
@@ -85,7 +93,7 @@ void update_grid(grid_t * g, particle_t * p, long long n_part)
         g->cells[c].center.y += p[i].position.y * p[i].mass;
         g->cells[c].mass += p[i].mass;
     }
-    
+
     for(long j = 0; j < g->size; j++)
     {
         if(is_cell_empty(g->cells[j]))
@@ -112,11 +120,61 @@ bool is_cell_empty(cell_t c)
     return c.mass == 0;
 }
 
+void update_force(grid_t* g, long j, particle_t* p)
+{
+  if(!is_cell_empty(g->cells[j]))
+  {
+      vector2_t direction;
+
+      particle_t b;
+      b.position.x = g->cells[j].center.x;
+      b.position.y = g->cells[j].center.y;
+      b.mass = g->cells[j].mass;
+
+      direction.x = b.position.x - p->position.x;
+      direction.y = b.position.y - p->position.y;
+
+      double magnitude = calculate_force_magnitude(*p, b);
+      p->force.x += direction.x * magnitude;
+      p->force.y += direction.y * magnitude;
+  }
+}
+
 void update_forces(grid_t * g, particle_t * p, long long n_part)
 {
+    long ngbr, aux, curr, ncside = g->ncside;
     for(long long i = 0; i < n_part; i++)
     {
-        for(long j = 0; j < g->size; j++)
+        //we need the 8 adjacent, and current cell, neighbours influence
+        curr = get_cell_index(g, p[i].position);
+        update_force(g, curr, &(p[i]));
+
+        ngbr = (curr - ncside < 0) ? curr + ((ncside - 1)*ncside) : (curr - ncside); //upper neighbour
+        update_force(g, ngbr, &(p[i]));
+
+        aux = ((ngbr % ncside) == 0) ? (ngbr + ncside - 1) : (ngbr - 1);		//upper left neighbour
+        update_force(g, aux, &(p[i]));
+
+        aux = ((ngbr + 1) % ncside == 0) ? (ngbr - ncside + 1) : (ngbr + 1);	//upper right neighbour
+        update_force(g, aux, &(p[i]));
+
+        ngbr = (curr + ncside >= (ncside*ncside)) ? curr - ((ncside - 1)*ncside) : (curr + ncside);	//lower neighbour
+        update_force(g, ngbr, &(p[i]));
+
+	      aux = ((ngbr) % ncside == 0) ? (ngbr + ncside - 1) : (ngbr - 1); //lower left neighbour
+        update_force(g, aux, &(p[i]));
+
+	      aux = ((ngbr + 1) % ncside == 0) ? (ngbr - ncside + 1) : (ngbr + 1);	//lower right neighbour
+        update_force(g, aux, &(p[i]));
+
+        ngbr = ((curr) % ncside == 0) ? (curr + ncside - 1) : (curr - 1);				//left neighbour
+        update_force(g, ngbr, &(p[i]));
+
+	      ngbr = ((curr + 1) % ncside == 0) ? (curr - ncside + 1) : (curr + 1);			//right neighbour
+        update_force(g, ngbr, &(p[i]));
+
+        /*this takes into account all particles*/
+        /*for(long j = 0; j < g->size; j++)
         {
             if(!is_cell_empty(g->cells[j]))
             {
@@ -134,7 +192,7 @@ void update_forces(grid_t * g, particle_t * p, long long n_part)
                 p[i].force.x += direction.x * magnitude;
                 p[i].force.y += direction.y * magnitude;
             }
-        }
+        }*/
     }
 }
 
