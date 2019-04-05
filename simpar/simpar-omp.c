@@ -7,6 +7,8 @@
 
 #include "simpar.h"
 
+cell_t** dummy;
+
 void usg_err(){
     printf("\t[-] usage : ./simpar <seed> <ncside> <n_par> <n_step>");
     printf("\t\t[-] int <seed> : seed for random number generation.\n");
@@ -33,9 +35,12 @@ long long val_l(const char* arg){
 
 cell_t** init_grid(const long ncside){
     cell_t** grid = (cell_t**)calloc(ncside, sizeof(cell_t*));
+    dummy = (cell_t**)calloc(ncside, sizeof(cell_t*));
     for(long c=0; c<ncside; c++){
         grid[c] = (cell_t*)calloc(ncside, sizeof(cell_t));
+	dummy[c] = (cell_t*)calloc(ncside, sizeof(cell_t));
         if(grid[c]==NULL) exit(0);
+	if(dummy[c]==NULL) exit(0);
     }
     return grid;
 }
@@ -43,8 +48,10 @@ cell_t** init_grid(const long ncside){
 void free_grid(cell_t** g, long ncside){
     for(long c=0; c<ncside; c++){
         free(g[c]);
+	free(dummy[c]);
     }
     free(g);
+    free(dummy);
 }
 
 void init_particles(long seed, long ncside, long long n_part, particle_t *par){
@@ -66,10 +73,13 @@ void init_env(cell_t** g, long ncside, particle_t* p, long long n_par){
         p[i].cy = (long) p[i].y * ncside;
         #pragma omp atomic
         g[p[i].cx][p[i].cy].M += p[i].m;
+	dummy[p[i].cx][p[i].cy].M += p[i].m;
         #pragma omp atomic
         g[p[i].cx][p[i].cy].x += p[i].m * p[i].x;
+	dummy[p[i].cx][p[i].cy].x += p[i].m * p[i].x;
         #pragma omp atomic
         g[p[i].cx][p[i].cy].y += p[i].m * p[i].y;
+	dummy[p[i].cx][p[i].cy].y += p[i].m * p[i].y;
     }
 }
 
@@ -94,35 +104,38 @@ void accellerate_p(double* ax, double* ay, const cell_t* c, double m, double x, 
 }
 
 void update_particles(cell_t** x, long ncside, particle_t* par, long long n_par, long n_step, long step){
+    double m, px, py, ax, ay;
+    long cx, cy, nx, ny, ux, uy, lx, ly; 
+    
     #pragma omp parallel if(n_par*n_step > 1000000)
     {
-      #pragma omp for reduction(+:t_mass, t_cx, t_cy), schedule(dynamic, 1000)
+      #pragma omp for private(m, px, py, ax, ay, cx, cy, nx, ny, ux, uy, lx, ly), reduction(+:t_mass, t_cx, t_cy), schedule(dynamic, 1000)
       for(long long i=0; i<n_par; i++){
-          double m = par[i].m;
-          double px = par[i].x;
-          double py = par[i].y;
-          long cx = (long) px * ncside, nx;
-          long cy = (long) py * ncside, ny;
-          long ux = cx+1, uy = cy+1, lx = cx-1, ly = cy-1;
+          m = par[i].m;
+          px = par[i].x;
+          py = par[i].y;
+          cx = (long) px * ncside, nx;
+          cy = (long) py * ncside, ny;
+          ux = cx+1; uy = cy+1; lx = cx-1; ly = cy-1;
           if(ux >= ncside) ux = 0;
           else if(lx < 0) lx = ncside-1;
           if(uy >= ncside) uy = 0;
           else if(ly < 0) ly = ncside-1;
 
-          double ax = 0.0;
-          double ay = 0.0;
+          ax = 0.0;
+          ay = 0.0;
 
-          accellerate_p(&ax, &ay, &(x[cx][cy]), m, px, py); // current cell
-          accellerate_p(&ax, &ay, &(x[ux][cy]), m, px, py); // right cell
-          accellerate_p(&ax, &ay, &(x[lx][cy]), m, px, py); // left cell
+          accellerate_p(&ax, &ay, &(dummy[cx][cy]), m, px, py); // current cell
+          accellerate_p(&ax, &ay, &(dummy[ux][cy]), m, px, py); // right cell
+          accellerate_p(&ax, &ay, &(dummy[lx][cy]), m, px, py); // left cell
           //upper adjacents
-          accellerate_p(&ax, &ay, &(x[cx][uy]), m, px, py); // upper cell
-          accellerate_p(&ax, &ay, &(x[lx][uy]), m, px, py); // upper left cell
-          accellerate_p(&ax, &ay, &(x[ux][uy]), m, px, py); // upper right cell
+          accellerate_p(&ax, &ay, &(dummy[cx][uy]), m, px, py); // upper cell
+          accellerate_p(&ax, &ay, &(dummy[lx][uy]), m, px, py); // upper left cell
+          accellerate_p(&ax, &ay, &(dummy[ux][uy]), m, px, py); // upper right cell
           //lower adjacents
-          accellerate_p(&ax, &ay, &(x[cx][ly]), m, px, py); // lower cell
-          accellerate_p(&ax, &ay, &(x[lx][ly]), m, px, py); // lower left cell
-          accellerate_p(&ax, &ay, &(x[ux][ly]), m, px, py); // lower right cell
+          accellerate_p(&ax, &ay, &(dummy[cx][ly]), m, px, py); // lower cell
+          accellerate_p(&ax, &ay, &(dummy[lx][ly]), m, px, py); // lower left cell
+          accellerate_p(&ax, &ay, &(dummy[ux][ly]), m, px, py); // lower right cell
 
           //update velocity
           par[i].vx += ax;
@@ -166,6 +179,13 @@ void update_particles(cell_t** x, long ncside, particle_t* par, long long n_par,
           }
       }
     }
+    
+    #pragma omp parallel for
+    for(long c = 0; c<ncside; c++){
+        for(long l = 0; l<ncside; l++){
+		dummy[c][l] = x[c][l];
+	}
+    }
 }
 
 int main(int argc, const char * argv[]) {
@@ -203,7 +223,7 @@ int main(int argc, const char * argv[]) {
 
     end_t = time(NULL);
     elapsed_t = ((int) (end_t - start_t));
-    //printf("%ds\n", elapsed_t);
+    printf("%ds\n", elapsed_t);
 
     free(par);
     free_grid(grid, ncside);
