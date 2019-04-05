@@ -8,7 +8,7 @@ endif
 all: simpar simpar-omp
 
 simpar: simpar.c
-		gcc -o simpar simpar.c
+		$(CC) -fopenmp -o simpar simpar.c
 
 simpar-omp: simpar-omp.c
 		$(CC) -fopenmp -o simpar-omp simpar-omp.c
