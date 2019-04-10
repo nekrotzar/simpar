@@ -8,10 +8,10 @@ endif
 all: simpar simpar-omp
 
 simpar: simpar.c
-		$(CC) -o simpar simpar.c
+		$(CC) -o simpar simpar.c -lm
 
 simpar-omp: simpar-omp.c
-		$(CC) -fopenmp -o simpar-omp simpar-omp.c
+		$(CC) -fopenmp -o simpar-omp simpar-omp.c -lm
 
 clean:
 		-rm -f test/output/*.out

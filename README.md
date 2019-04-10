@@ -10,11 +10,11 @@ The **-lm** flag is required when compiling the parallel code to link the math l
 ### Compile the source code
 > Serial
 ```shell
-$ gcc -lm -fopenmp -o simpar simpar.c
+$ gcc -fopenmp -o simpar simpar.c -lm
 ```
 > Parallel
 ```shell
-$ gcc -lm -fopenmp -o simpar-omp simpar-omp.c
+$ gcc -fopenmp -o simpar-omp simpar-omp.c -lm
 ```
 
 ### Execute the source code
