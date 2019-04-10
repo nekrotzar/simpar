@@ -1,13 +1,12 @@
 /**
  * @file simpar.h
- * @authors: Luís Fonseca, Filipe Marques
- * @date 9 Apr 2019
- * @brief File containing the particle simulation data structures and functions.
+ * @authors: Filipe Marques, Luís Fonseca
+ * @date 16 Mar 2019
+ * @brief Header File containing the particle simulation data structures and functions headers.
  *
  * Both the structs and relevant functions are here defined for usage in
  * the n-body gravitational simulation. Some physical constants are defined
  * as variables. For a detailed overview of the project visit the link below.
- * @see https://github.com/nekrotzar/simpar
  */
 
 #ifndef simpar_h
@@ -18,58 +17,23 @@
 #include <math.h>
 #include <time.h>
 
-#define RND0_1 ((double) random() / ((long long)1<<31))
-#define G 6.67408e-11
-#define EPSLON 0.0005
-
-#define GRID_MIN_X 0
-#define GRID_MAX_X 1
-#define GRID_MIN_Y 0
-#define GRID_MAX_Y 1
-
-typedef int bool;
-
-#define TRUE 1
-#define FALSE 0
-
-/**
- * @brief Point in 2D space.
- *
- * A geometry point with two coordinates to represent particle positions.
- **/
-struct point2_t
-{
-    double x; /**< x component of the point. */
-    double y; /**< y component of the point. */
-};
-typedef struct point2_t point2_t;
-
-/**
- * @brief Vector in 2D space.
- *
- * A geometry vector with two coordinates to represent phyisics vectors.
- **/
-struct vector2_t
-{
-    double x; /**< x component of the point. */
-    double y; /**< y component of the point. */
-};
-typedef struct vector2_t vector2_t;
+#define RND0_1 ((double) random() / ((long long)1<<31)) /*Random number generator*/
+#define G 6.67408e-11 /*Gravitation*/
+#define EPSLON 0.0005 /*distance threshold*/
 
 /**
  * @brief Particle.
  *
  * A particle containing information about its position,
- * velocity and force at a given time-step and its constant mass.
+ * velocity, mass and grid position at a given time-step
+ * and its constant mass.
  **/
-struct particle_t
-{
-    point2_t position;  /**< position in 2D space. */
-    vector2_t velocity; /**< speed in 2D space. */
-    vector2_t force;    /**< scalar acceleration. */
-    double mass;        /**< mass in kg. */
-};
-typedef struct particle_t particle_t;
+typedef struct particle_t{
+    double x, y;    /**<position (x, y) in 2D space. */
+    double vx, vy;  /**<velocity (vx, vy) in 2D space. */
+    double m;       /**<mass. */
+    long cx, cy;    /**<grid index position (cx, cy). */
+}particle_t;
 
 /**
  * @brief Grid cell in 2D space.
@@ -77,26 +41,54 @@ typedef struct particle_t particle_t;
  * A grid cell containing a point representing the center of mass and the total
  * mass of all the particles inside this cell..
  **/
-struct cell_t
-{
-    point2_t center; /**< center of mass of the cell. */
-    double mass;     /**< total mass of the cell. */
-};
-typedef struct cell_t cell_t;
+typedef struct cell_t{
+    double x, y; /**< center of mass of the cell. */
+    double M;    /**< total mass of the cell. */
+}cell_t;
+
+double t_mass = 0.0;            /* global variable to hold the total mass of the grid */
+double t_cx = 0.0, t_cy = 0.0;  /* global variables to hold  the position of the total center of mass*/
 
 /**
- * @brief Grid in 2D space.
+ * @brief Output usage command error to console.
  *
- * A wrap around grid limited by the points (0,0) and (1,1) containing
- * ncside * ncside cells.
- **/
-struct grid_t
-{
-    long ncside;
-    long size;
-    cell_t *cells;
-};
-typedef struct grid_t grid_t;
+ */
+void usg_err(void);
+
+/**
+ * @brief Validate a char to parse the corresponding positive integer.
+ *
+ * Parses the value pointed by a character pointer to extarct a positive long
+ * numerical value if this can't be accomplished or the value is negative then
+ * the function returns 0 with an error message.
+ *
+ * @param arg char ptr from which's pointed value to parse a numeric.
+ * @return long integer parsed from arg on success, or 0 on fail.
+ */
+long long val_l(const char* arg);
+
+/**
+ * @brief Initialize grid  by allocating memory for each cell.
+ *
+ * Initialization of a square 2D array of type cell_t, using a
+ * given ncside to allow for cell_t memory allocation. Each cell
+ * center of mass positions and mass are initialized to 0.
+ *
+ * @param ncside Size of the grid (number of cells on the side).
+ * @return pointer to cell_t 2D array (cell_t**)
+ */
+cell_t** init_grid(const long ncside);
+
+/**
+ * @brief Frees up the space previously allocated for the grid;
+ *
+ * Iterates through input grid, freeing each cell line by line,
+ *  and then finally frees space allocated for the grid.
+ *
+ * @param g double pointer to grid to be freed.
+ * @param ncside Size of the grid (number of cells on the side).
+ */
+void free_grid(cell_t** g, long ncside);
 
 /**
  * @brief Initialize particle system with random physical properties.
@@ -110,147 +102,53 @@ typedef struct grid_t grid_t;
  * @param n_part Number of particles.
  * @param p Pointer to an array of particles.
  */
-void init_particles(long seed, long ncside, long long n_part, particle_t *p);
+void init_particles(long seed, long ncside, long long n_part, particle_t *par);
 
 /**
- * @brief Initialize 2D grid where particles are located.
+ * @brief Initialize Environment, i.e, grid and set particles grid positions.
  *
- * Initialization of an array of type cell_t, using the
- * default values for cell position and total mass. Assignment
- * of the grid number of sides and total size.
+ * Initialization of each particle's initial grid indices, and from there
  *
+ *
+ * @param g Double pointer to grid to be freed.
  * @param ncside Size of the grid (number of cells on the side).
- * @param g Pointer to a struct of type grid_t.
- **/
-void init_grid(long ncside, grid_t *g);
-
-/**
- * @brief Determine the center of mass of each cell.
- *
- * Calculate the center of mass of each cell in the grid by checking
- * each particle position in order to update the center and mass of the
- * cell which the particle belongs to. The function time complexity is
- * O(n + c) where n is the number of particles and c the number of cells.
- *
- * @param grid Pointer to a struct of type grid_t.
  * @param p Pointer to an array of particles.
  * @param n_part Number of particles.
  */
-void update_grid(grid_t *grid, particle_t *p, long long n_part);
+void init_env(cell_t** g, long ncside, particle_t* p, long long n_par);
 
 /**
- * @brief Get the cell index object.
+ * @brief Compute the gravitational accelleration applied to a particle, by a given cell's center of mass.
  *
- * @param g Pointer to a struct of type grid_t.
- * @param p Particle position to check.
- * @return long The index of the cell where the particle lies.
+ * The accelleration relative to a given center of mass applied on a particle
+ * is calculated only from knoing that F=m_p*a and F=G*(M*m_a)/d^2 which holds
+ * a=G*M/d^2, if the distance (d) is bellow EPSLON then it is counted as a zero
+ * accelleration contributionnction.
+ *
+ * @param ax Pointer to a variable (initialized to 0.0) to which to add the x component of acceleration due to c's center of mass.
+ * @param ax Pointer to a variable (initialized to 0.0) to which to add the y component of acceleration due to c's center of mass.
+ * @param c Pointer to struct of type cell_t.
+ * @param m Mass of the particle being considered
+ * @param x Position, in axis x, of the particle.
+ * @param y Position, in axis y, of the particle.
  */
-long get_cell_index(grid_t *g, point2_t p);
-
-/**
- * @brief Check if a cell is empty.
- *
- * Check if the cell is empty by looking at the total mass
- * of the cell.
- *
- * @param c A struct of type cell_t.
- * @return true If mass is equal to zero.
- * @return false Mass is not zero.
- */
-bool is_cell_empty(cell_t c);
-
-
-/**
- * @brief Compute the gravitational force applied to a particle, by a given cell's center of mass.
- *
- * The force on a particle is calculated only from the centers of masses of
- * its current and all adjacent cells. The function time complexity is
- * O(n * c) where n is the number of particles and c the number of cells.
- * Given this, this is the main target for parallellization.
- *
- * @param g Pointer to a struct of type grid_t.
- * @param p Pointer to an array of particles.
- * @param n_part Number of particles.
- */
-void update_force(grid_t* g, long j, particle_t* p);
-
-/**
- * @brief Compute the gravitational force applied to each particle.
- *
- * The force on a particle is calculated only from the centers of masses of
- * its current and all adjacent cells. The function time complexity is
- * O(n * c) where n is the number of particles and c the number of cells.
- * Given this, this is the main target for parallellization.
- *
- * @param g Pointer to a struct of type grid_t.
- * @param p Pointer to an array of particles.
- * @param n_part Number of particles.
- */
-void update_forces(grid_t *g, particle_t *p, long long n_part);
-
-/**
- * @brief The magnitude of the force between particles A and B.
- *
- * The function calculates the gravitacional force between two particles given
- * the formula: Fa,b = Fb,a = G mA * mB / dA,B ^2
- *
- * @param pA Particle A.
- * @param pB Partible B.
- * @return double Force magnitude.
- */
-double calculate_force_magnitude(particle_t pA, particle_t pB);
-
-/**
- * @brief Calculate distance between two points in 2D space.
- *
- * The function calculates the distance between two particles given
- * the formula: d = √((pB.x - pA.x)^2 + (pB.y - pA.y)^2)
- *
- * @param pA Position of A.
- * @param pB Position of B.
- * @return double Distance between two points.
- */
-double calculate_distance(point2_t pA, point2_t pB);
+void accellerate_p(double* ax, double* ay, const cell_t* c, double m, double x, double y);
 
 /**
  * @brief Calculate the new velocity and then the new position of each particle.
  *
  * Update each particle in the system state at a given time-step of the simulation.
  * The function time complexity is O(n) where n is the number of particles.
+ * Update the centers of mass in the grid.
+ * On the last iteration the total center of mass is also calculated.
  *
+ * @param x Pointer to a 2D array of cells.
+ * @param ncside Size of the grid (number of cells on the side).
  * @param p Pointer to an array of particles.
  * @param n_part Number of particles.
+ * @param n_step Number of timesteps.
+ * @param step Current timestep.
  */
-void update_particles(particle_t * p, long long n_part);
-
-/**
- * @brief Calculate the particle new values for velocity and position.
- *
- * The simulation time-step is discretized so each time-step corresponds to 1s.
- * After setting each new position, we check if the new position goes outside the grid
- * and if so determine its new position inside the grid accordingly.
- *
- * @param index Particle index.
- * @param p Pointer to an array of particles.
- * @param dt Simulation time-step.
- */
-void update_particle(long long index, particle_t *p, double dt);
-
-/**
- * @brief Display the particle system information.
- *
- * @param p Pointer to an array of particles.
- * @param n_part Number of particles.
- */
-void display_particles(particle_t *p, long long n_part);
-
-/**
- * @brief Determine the center of mass of the particle system.
- *
- * @param p Pointer to an array of particles.
- * @param n_part Number of particles.
- * @return point2_t The center of mass 2D point.
- */
-point2_t get_center_of_mass(particle_t *p, long long n_part);
+void update_particles(cell_t** x, long ncside, particle_t* par, long long n_par, long n_step, long step);
 
 #endif /* simpar_h */
