@@ -26,10 +26,10 @@ if [[ "$OS" == "Darwin" ]]; then
 	echo 'Memory Size (MB):' "$((`sysctl -n hw.memsize` / (1024*1024)))"  | tee -a data/system_info.txt
 else
 	echo 'OS: Linux' | tee -a data/system_info.txt
-	echo 'Processor Vendor: ' `cat /proc/cpuinfo | grep 'vendor' | uniq` | tee -a  data/system_info.txt
-	echo 'Processor Name/Speed: ' `cat /proc/cpuinfo | grep 'model name' | uniq` | tee -a data/system_info.txt
+	echo 'Processor Vendor: ' `cat /proc/cpuinfo | grep 'vendor' -m 1 | cut -d":" -f2` | tee -a  data/system_info.txt
+	echo 'Processor Name/Speed: ' `cat /proc/cpuinfo | grep 'model name' -m 1 | cut -d":" -f2` | tee -a data/system_info.txt
 	echo 'Total Number of Cores: ' `cat /proc/cpuinfo | grep 'processor' | wc -l` | tee -a data/system_info.txt
-	echo 'Memory Size (MB)' "$((`grep MemTotal /proc/meminfo | awk '{print $2}'` / 1024))" | tee -a data/system_info.txt
+	echo 'Memory Size (MB): ' "$((`grep MemTotal /proc/meminfo | awk '{print $2}'` / 1024))" | tee -a data/system_info.txt
 fi
 echo "===================================="
 echo
