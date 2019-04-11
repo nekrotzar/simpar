@@ -9,37 +9,44 @@ if [ ! -f "$EXE" ]; then
 	exit 1
 fi
 
+mkdir -p data
+if [ -f data/system_info.txt ]; then
+	rm data/system_info.txt
+fi
+
 echo "===================================="
 echo 'System Info'
 echo "------------------------------------"
 
 if [[ "$OS" == "Darwin" ]]; then
-	echo 'OS: macOS'
-	echo 'Processor Vendor: ' `sysctl -n machdep.cpu.vendor`
-	echo 'Processor Name/Speed: ' `sysctl -n machdep.cpu.brand_string`
-	echo 'Total Number of Cores: ' `sysctl -n machdep.cpu.core_count`
-	echo 'Total Number of Threads: ' `sysctl -n machdep.cpu.thread_count`
-	echo 'Memory Size (MB):' "$((`sysctl -n hw.memsize` / (1024*1024)))"
+	echo 'OS: macOS' | tee -a data/system_info.txt
+	echo 'Processor Vendor: ' `sysctl -n machdep.cpu.vendor` | tee -a data/system_info.txt
+	echo 'Processor Name/Speed: ' `sysctl -n machdep.cpu.brand_string` | tee -a data/system_info.txt
+	echo 'Total Number of Cores: ' `sysctl -n machdep.cpu.core_count` | tee -a data/system_info.txt
+	echo 'Memory Size (MB):' "$((`sysctl -n hw.memsize` / (1024*1024)))"  | tee -a data/system_info.txt
 else
-	echo 'OS: Linux'
-	echo 'Processor Vendor: ' `cat /proc/cpuinfo | grep 'vendor' | uniq`
-	echo 'Processor Name/Speed: ' `cat /proc/cpuinfo | grep 'model name' | uniq`
-	echo 'Total Number of Cores: ' `cat /proc/cpuinfo | grep 'processor' | wc -l`
-	echo 'Memory Size (MB)' "$((`grep MemTotal /proc/meminfo | awk '{print $2}'` / 1024))"
+	echo 'OS: Linux' | tee -a data/system_info.txt
+	echo 'Processor Vendor: ' `cat /proc/cpuinfo | grep 'vendor' | uniq` | tee -a  data/system_info.txt
+	echo 'Processor Name/Speed: ' `cat /proc/cpuinfo | grep 'model name' | uniq` | tee -a data/system_info.txt
+	echo 'Total Number of Cores: ' `cat /proc/cpuinfo | grep 'processor' | wc -l` | tee -a data/system_info.txt
+	echo 'Memory Size (MB)' "$((`grep MemTotal /proc/meminfo | awk '{print $2}'` / 1024))" | tee -a data/system_info.txt
 fi
 echo "===================================="
 echo
 
+# Save system info in a file
+
+
 if [[ -n "$PROGRAM" ]]; then
-	
-	# Create output directory if not exists
-	mkdir -p test/output
-	
+		
 	if [[ "$PROGRAM" == "simpar" ]]; then
-		echo "MODE: serial"
+		label='serial'
+		NUM_THREADS=1
+		echo "MODE: $label"
 	elif [[ "$PROGRAM" == "simpar-omp" ]]; then
 		export OMP_NUM_THREADS="$NUM_THREADS"
-		echo "MODE: OpenMP parallel"
+		label='parallel'
+		echo "MODE: OpenMP $label"
 		echo "NUMBER OF THREADS: $NUM_THREADS"
 	fi
 	
@@ -47,6 +54,14 @@ if [[ -n "$PROGRAM" ]]; then
 	SUCCESS=0
 	FAILURE=0
 
+	# Remove file if it exists
+	if [ -f data/"$label"_cpu"$NUM_THREADS"_results.csv ]; then
+		rm data/"$label"_cpu"$NUM_THREADS"_results.csv
+	fi
+	printf "Seed,Grid size,Particles,Steps,Processors,Real time, User time,System time,CPU percentage,Label,Correctness\n" >> data/"$label"_cpu"$NUM_THREADS"_results.csv
+	
+	# Create output directory if not exists
+	mkdir -p test/output
 	for filename in test/input/*.in
 	do
 		echo "____________________________________"
@@ -54,11 +69,28 @@ if [[ -n "$PROGRAM" ]]; then
 				
 		# Get arguments from file
 		while read name; do
-			echo "Name read from file - $name"
+			echo Name read from file - "$name"
 		done < "$filename"
 
+		seed="$(cut -d' ' -f1 <<< $name)"
+		ncside="$(cut -d' ' -f2 <<< $name)"
+		npart="$(cut -d' ' -f3 <<< $name)"
+		step="$(cut -d' ' -f4 <<< $name)"
+
 		echo "TEST #$COUNT : ./"$PROGRAM" "$name""
-		echo "Execution times : " `{ time ./"$PROGRAM" $name > test/output/test$COUNT.out 2>&1 ; } 2>&1`
+
+		results=`{ (TIMEFORMAT="%R %U %S %P"; time ./"$PROGRAM" $name > test/output/test$COUNT.out 2>&1) ; } 2>&1`
+		
+		realt="$(cut -d' ' -f1 <<< $results)"
+		usert="$(cut -d' ' -f2 <<< $results)"
+		systt="$(cut -d' ' -f3 <<< $results)"
+		cpupc="$(cut -d' ' -f4 <<< $results)"
+
+		echo "Execution results"
+		echo "	Elapsed time: $realt s"
+		echo "	Number of CPU seconds spent in user mode: $usert s"
+		echo "	Number of CPU seconds spent in system mode: $systt s"
+		echo "	CPU percentage: $cpupc %"
 
 		file1="test/validation/test$COUNT.txt"
 		file2="test/output/test$COUNT.out"
@@ -68,13 +100,19 @@ if [[ -n "$PROGRAM" ]]; then
 		STATUS="$(diff "$file1" "$file2")"
 
 		if [ -n "$STATUS" ] ; then
-			echo "FAILURE :"
+			test_status='FAILURE'
+			echo "$test_status:"
 			echo "$STATUS"
 			FAILURE=$((FAILURE+1))
 		else
-			echo "SUCCESS"
+			test_status='SUCCESS'
+			echo "$test_status"
 			SUCCESS=$((SUCCESS+1))
 		fi
+
+		# Store values in a csv file
+		printf "$seed,$ncside,$npart,$step,$NUM_THREADS,$realt,$usert,$systt,$cpupc,$label,$test_status\n" >> data/"$label"_cpu"$NUM_THREADS"_results.csv
+
 	done
 	echo "____________________________________"
 	echo "FINISHED: $SUCCESS out of $COUNT successfull tests"
