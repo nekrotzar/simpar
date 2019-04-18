@@ -1,0 +1,5 @@
+OS: Linux
+Processor Vendor:  GenuineIntel
+Processor Name/Speed:  Intel(R) Core(TM) i5 CPU 760 @ 2.80GHz
+Total Number of Cores:  4
+Memory Size (MB):  16030

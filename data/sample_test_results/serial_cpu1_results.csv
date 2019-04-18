@@ -1,0 +1,8 @@
+Seed,Grid size,Particles,Steps,Processors,Real time, User time,System time,CPU percentage,Label,Correctness
+1,3,10,2,1,0.006,0.002,0.000,35.14,serial,SUCCESS
+3,10,100,5,1,0.005,0.002,0.000,39.51,serial,FAILURE
+3,5,500,5,1,0.005,0.002,0.000,48.74,serial,SUCCESS
+2,5,10000,10,1,0.025,0.019,0.004,89.21,serial,SUCCESS
+4,20,100000,5,1,0.091,0.088,0.000,97.08,serial,SUCCESS
+8,5,1000000,50,1,6.753,6.716,0.032,99.91,serial,SUCCESS
+2,20,100000000,5,1,77.711,75.827,1.803,99.89,serial,SUCCESS
